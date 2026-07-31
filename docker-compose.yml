@@ -1,0 +1,187 @@
+version: "3.9"
+
+# ═══════════════════════════════════════════════════════════════
+# Sync Engine — Docker Compose
+# 7 containers: 3 infrastructure + 4 application services
+# ═══════════════════════════════════════════════════════════════
+
+networks:
+  sync-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redis-data:
+
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  # 1. PostgreSQL — Multi-schema database
+  # ─────────────────────────────────────────────────────────────
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: postgres-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sync_admin
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: sync_engine
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - sync-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U sync_admin -d sync_engine" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. Redis — Pub/Sub + Streams broker
+  # ─────────────────────────────────────────────────────────────
+  redis-broker:
+    image: redis:7-alpine
+    container_name: redis-broker
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis-broker/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - sync-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Nginx API Gateway
+  # ─────────────────────────────────────────────────────────────
+  gateway:
+    image: nginx:alpine
+    container_name: gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      user-service:
+        condition: service_healthy
+      sync-service-1:
+        condition: service_started
+      sync-service-2:
+        condition: service_started
+    networks:
+      - sync-network
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. User & Auth Service
+  # ─────────────────────────────────────────────────────────────
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      DATABASE_URL: postgresql://sync_admin:changeme@postgres-db:5432/sync_engine
+      JWT_SECRET: super-secret-256-bit-key-for-dev-only
+      JWT_EXPIRY: "24h"
+      NODE_ENV: development
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - sync-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ─────────────────────────────────────────────────────────────
+  # 5. Sync Service — Node 1
+  # ─────────────────────────────────────────────────────────────
+  sync-service-1:
+    build:
+      context: ./sync-service
+      dockerfile: Dockerfile
+    container_name: sync-service-1
+    restart: unless-stopped
+    environment:
+      SYNC_SERVICE_PORT: "4000"
+      NODE_ID: sync-1
+      REDIS_URL: redis://redis-broker:6379
+      JWT_SECRET: super-secret-256-bit-key-for-dev-only
+      USER_SERVICE_URL: http://user-service:3000
+      DATABASE_URL: postgresql://sync_admin:changeme@postgres-db:5432/sync_engine
+      NODE_ENV: development
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    networks:
+      - sync-network
+
+  # ─────────────────────────────────────────────────────────────
+  # 6. Sync Service — Node 2 (Horizontally Scaled)
+  # ─────────────────────────────────────────────────────────────
+  sync-service-2:
+    build:
+      context: ./sync-service
+      dockerfile: Dockerfile
+    container_name: sync-service-2
+    restart: unless-stopped
+    environment:
+      SYNC_SERVICE_PORT: "4001"
+      NODE_ID: sync-2
+      REDIS_URL: redis://redis-broker:6379
+      JWT_SECRET: super-secret-256-bit-key-for-dev-only
+      USER_SERVICE_URL: http://user-service:3000
+      DATABASE_URL: postgresql://sync_admin:changeme@postgres-db:5432/sync_engine
+      NODE_ENV: development
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    networks:
+      - sync-network
+
+  # ─────────────────────────────────────────────────────────────
+  # 7. Persist Worker — Background Snapshot Writer
+  # ─────────────────────────────────────────────────────────────
+  persist-worker:
+    build:
+      context: ./persist-worker
+      dockerfile: Dockerfile
+    container_name: persist-worker
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis-broker:6379
+      DATABASE_URL: postgresql://sync_admin:changeme@postgres-db:5432/sync_engine
+      FLUSH_INTERVAL_MS: "5000"
+      FLUSH_THRESHOLD: "50"
+      CONSUMER_NAME: worker-1
+      NODE_ENV: development
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-broker:
+        condition: service_healthy
+    networks:
+      - sync-network

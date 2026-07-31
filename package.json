@@ -1,0 +1,21 @@
+{
+    "name": "sync-engine",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Real-time collaborative document editing platform",
+    "workspaces": [
+        "packages/shared-types",
+        "user-service",
+        "sync-service",
+        "persist-worker"
+    ],
+    "scripts": {
+        "dev:user": "npm run dev --workspace=user-service",
+        "dev:sync": "npm run dev --workspace=sync-service",
+        "dev:persist": "npm run dev --workspace=persist-worker",
+        "build:all": "npm run build --workspaces",
+        "docker:up": "docker-compose up --build -d",
+        "docker:down": "docker-compose down",
+        "docker:logs": "docker-compose logs -f"
+    }
+}
