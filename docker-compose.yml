@@ -83,6 +83,7 @@ services:
 
   # ─────────────────────────────────────────────────────────────
   # 4. User & Auth Service
+  # Runs Drizzle migrations (users_schema tables) before starting.
   # ─────────────────────────────────────────────────────────────
   user-service:
     build:
@@ -90,12 +91,14 @@ services:
       dockerfile: Dockerfile
     container_name: user-service
     restart: unless-stopped
+    # Run drizzle-kit migrate then start the service
+    command: sh -c "npm run db:migrate && node dist/index.js"
     environment:
       PORT: "3000"
       DATABASE_URL: postgresql://sync_admin:changeme@postgres-db:5432/sync_engine
       JWT_SECRET: super-secret-256-bit-key-for-dev-only
       JWT_EXPIRY: "24h"
-      NODE_ENV: development
+      NODE_ENV: production
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -106,7 +109,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 20s
 
   # ─────────────────────────────────────────────────────────────
   # 5. Sync Service — Node 1
@@ -124,7 +127,7 @@ services:
       JWT_SECRET: super-secret-256-bit-key-for-dev-only
       USER_SERVICE_URL: http://user-service:3000
       DATABASE_URL: postgresql://sync_admin:changeme@postgres-db:5432/sync_engine
-      NODE_ENV: development
+      NODE_ENV: production
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -151,7 +154,7 @@ services:
       JWT_SECRET: super-secret-256-bit-key-for-dev-only
       USER_SERVICE_URL: http://user-service:3000
       DATABASE_URL: postgresql://sync_admin:changeme@postgres-db:5432/sync_engine
-      NODE_ENV: development
+      NODE_ENV: production
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -164,6 +167,7 @@ services:
 
   # ─────────────────────────────────────────────────────────────
   # 7. Persist Worker — Background Snapshot Writer
+  # Runs Drizzle migrations (documents_schema tables) before starting.
   # ─────────────────────────────────────────────────────────────
   persist-worker:
     build:
@@ -171,13 +175,15 @@ services:
       dockerfile: Dockerfile
     container_name: persist-worker
     restart: unless-stopped
+    # Run drizzle-kit migrate then start the worker
+    command: sh -c "npm run db:migrate && node dist/index.js"
     environment:
       REDIS_URL: redis://redis-broker:6379
       DATABASE_URL: postgresql://sync_admin:changeme@postgres-db:5432/sync_engine
       FLUSH_INTERVAL_MS: "5000"
       FLUSH_THRESHOLD: "50"
       CONSUMER_NAME: worker-1
-      NODE_ENV: development
+      NODE_ENV: production
     depends_on:
       postgres-db:
         condition: service_healthy

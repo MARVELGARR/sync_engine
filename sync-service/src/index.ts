@@ -6,7 +6,7 @@ import { config } from "./config/env.js";
 import { syncLogger } from "./utils/logger.js";
 import { verifyToken, authorizeUser } from "./auth/auth.js";
 import { connectRedis, disconnectRedis } from "./redis/redis.manager.js";
-import { getOrCreateRoom, destroyAllRooms, type ClientInfo } from "./rooms/document.room.js";
+import { getOrCreateRoom, destroyAllRooms, getUserConnectionCount, type ClientInfo } from "./rooms/document.room.js";
 import { closePool } from "./db/snapshot.loader.js";
 
 // ─── HTTP Server ────────────────────────────────────────────────
@@ -53,13 +53,34 @@ wss.on("connection", async (ws: WebSocket, req: http.IncomingMessage) => {
         return;
     }
 
+    // ── Enforce global user connection limit (max 10) ─────────
+    const userConnCount = getUserConnectionCount(jwtPayload.sub);
+    if (userConnCount >= 10) {
+        syncLogger.warn(
+            { docId, userId: jwtPayload.sub, userConnCount },
+            "WebSocket connection rejected: user connection limit exceeded (max 10)"
+        );
+        ws.close(4006, "User active connection limit exceeded");
+        return;
+    }
+
+    const room = await getOrCreateRoom(docId);
+
+    // ── Enforce room connection limit (max 50) ────────────────
+    if (room.clients.size >= 50) {
+        syncLogger.warn(
+            { docId, userId: jwtPayload.sub, roomSize: room.clients.size },
+            "WebSocket connection rejected: room connection limit exceeded (max 50)"
+        );
+        ws.close(4005, "Document room connection limit exceeded");
+        return;
+    }
+
     // ── Join the Document Room ────────────────────────────────
     syncLogger.info(
         { docId, userId: jwtPayload.sub, permission: authResult.permission },
         "WebSocket connection authorized"
     );
-
-    const room = await getOrCreateRoom(docId);
 
     const clientInfo: ClientInfo = {
         ws,

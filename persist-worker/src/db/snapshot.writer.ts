@@ -1,48 +1,48 @@
 import { Pool } from "pg";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { desc, eq, sql } from "drizzle-orm";
 import { config } from "../config/env.js";
 import { snapshotLogger } from "../utils/logger.js";
+import { documentSnapshots, documentDeltas, type DeltaInsert } from "./schema.js";
 
+// ─── Drizzle DB Instance ─────────────────────────────────────────
 const pool = new Pool({
     connectionString: config.databaseUrl,
     max: 5,
-    idleTimeoutMillis: 30000,
+    idleTimeoutMillis: 30_000,
 });
 
 pool.on("error", (err) => {
     snapshotLogger.error({ err }, "PostgreSQL pool error");
 });
 
+const db: NodePgDatabase = drizzle(pool);
+
 /**
- * Write a document snapshot to PostgreSQL.
- * Uses an upsert-like approach: insert with the next version number.
+ * Write a document snapshot to PostgreSQL using an atomic transaction.
+ * Derives the next version from the current max + 1.
  */
 export async function writeSnapshot(
     documentId: string,
     snapshotData: Buffer
 ): Promise<number> {
-    const client = await pool.connect();
-    try {
-        await client.query("BEGIN");
-
+    return db.transaction(async (tx) => {
         // Get the current max version for this document
-        const versionResult = await client.query(
-            `SELECT COALESCE(MAX(snapshot_version), 0) AS max_version
-       FROM documents_schema.document_snapshots
-       WHERE document_id = $1`,
-            [documentId]
-        );
+        const [versionRow] = await tx
+            .select({
+                maxVersion: sql<number>`COALESCE(MAX(${documentSnapshots.snapshotVersion}), 0)`,
+            })
+            .from(documentSnapshots)
+            .where(eq(documentSnapshots.documentId, documentId));
 
-        const nextVersion = (versionResult.rows[0].max_version as number) + 1;
+        const nextVersion = (versionRow?.maxVersion ?? 0) + 1;
 
         // Insert the new snapshot
-        await client.query(
-            `INSERT INTO documents_schema.document_snapshots
-         (document_id, snapshot_data, snapshot_version)
-       VALUES ($1, $2, $3)`,
-            [documentId, snapshotData, nextVersion]
-        );
-
-        await client.query("COMMIT");
+        await tx.insert(documentSnapshots).values({
+            documentId,
+            snapshotData: snapshotData as unknown as Uint8Array,
+            snapshotVersion: nextVersion,
+        });
 
         snapshotLogger.info(
             { documentId, version: nextVersion, sizeBytes: snapshotData.length },
@@ -50,13 +50,7 @@ export async function writeSnapshot(
         );
 
         return nextVersion;
-    } catch (err) {
-        await client.query("ROLLBACK");
-        snapshotLogger.error({ err, documentId }, "Failed to write snapshot");
-        throw err;
-    } finally {
-        client.release();
-    }
+    });
 }
 
 /**
@@ -67,48 +61,36 @@ export async function writeDeltaAudit(
 ): Promise<void> {
     if (entries.length === 0) return;
 
-    const client = await pool.connect();
-    try {
-        await client.query("BEGIN");
+    const rows: DeltaInsert[] = entries.map((e) => ({
+        documentId: e.documentId,
+        deltaData: e.deltaData as unknown as Uint8Array,
+        userId: e.userId,
+    }));
 
-        for (const entry of entries) {
-            await client.query(
-                `INSERT INTO documents_schema.document_deltas
-           (document_id, delta_data, user_id)
-         VALUES ($1, $2, $3)`,
-                [entry.documentId, entry.deltaData, entry.userId]
-            );
-        }
+    await db.transaction(async (tx) => {
+        await tx.insert(documentDeltas).values(rows);
+    });
 
-        await client.query("COMMIT");
-        snapshotLogger.debug(
-            { count: entries.length },
-            "Delta audit entries written"
-        );
-    } catch (err) {
-        await client.query("ROLLBACK");
-        snapshotLogger.error({ err }, "Failed to write delta audit entries");
-    } finally {
-        client.release();
-    }
+    snapshotLogger.debug(
+        { count: entries.length },
+        "Delta audit entries written"
+    );
 }
 
 /**
- * Load the latest snapshot for a document (used to reconstruct Y.Doc).
+ * Load the latest snapshot for a document (used to reconstruct Y.Doc in persist-worker on startup).
  */
 export async function loadLatestSnapshot(
     documentId: string
 ): Promise<Buffer | null> {
-    const result = await pool.query(
-        `SELECT snapshot_data
-     FROM documents_schema.document_snapshots
-     WHERE document_id = $1
-     ORDER BY snapshot_version DESC
-     LIMIT 1`,
-        [documentId]
-    );
+    const [row] = await db
+        .select({ snapshotData: documentSnapshots.snapshotData })
+        .from(documentSnapshots)
+        .where(eq(documentSnapshots.documentId, documentId))
+        .orderBy(desc(documentSnapshots.snapshotVersion))
+        .limit(1);
 
-    return result.rows.length > 0 ? result.rows[0].snapshot_data : null;
+    return row ? (row.snapshotData as unknown as Buffer) : null;
 }
 
 export async function closePool(): Promise<void> {

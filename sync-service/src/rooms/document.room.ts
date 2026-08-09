@@ -146,16 +146,27 @@ export class DocumentRoom {
 
             switch (messageType) {
                 case MESSAGE_SYNC: {
-                    // Read-only users cannot send sync updates
+                    // Peek the sync message type without consuming the original decoder
+                    const peekDecoder = decoding.createDecoder(data);
+                    decoding.readVarUint(peekDecoder); // consume MESSAGE_SYNC
+                    const syncMessageType = decoding.readVarUint(peekDecoder);
+
+                    if (clientInfo.permission === "read" && syncMessageType !== 0) {
+                        roomLogger.warn(
+                            { docId: this.docId, userId: clientInfo.userId, syncMessageType },
+                            "Read-only user attempted to send a sync update - ignored"
+                        );
+                        break;
+                    }
+
                     const encoder = encoding.createEncoder();
                     encoding.writeVarUint(encoder, MESSAGE_SYNC);
 
-                    const syncMessageType = syncProtocol.readSyncMessage(
+                    syncProtocol.readSyncMessage(
                         decoder,
                         encoder,
                         this.yDoc,
-                        // Only allow writes from read-write users
-                        clientInfo.permission === "read-write" ? ws : null
+                        ws
                     );
 
                     // If the encoder has content (e.g., SyncStep2 response), send it back
@@ -307,6 +318,21 @@ export class DocumentRoom {
 
 // ─── Global Room Registry ───────────────────────────────────────
 export const rooms: Map<string, DocumentRoom> = new Map();
+
+/**
+ * Get count of active connections for a user across all rooms on this node.
+ */
+export function getUserConnectionCount(userId: string): number {
+    let count = 0;
+    for (const room of rooms.values()) {
+        for (const client of room.clients.values()) {
+            if (client.userId === userId) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
 
 /**
  * Get or create a document room.
