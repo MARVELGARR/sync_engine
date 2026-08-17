@@ -1,11 +1,26 @@
 import {
     pgSchema,
     uuid,
-    bytea,
     integer,
     timestamp,
     uniqueIndex,
+    customType,
 } from "drizzle-orm/pg-core";
+
+export const bytea = customType<{ data: Buffer }>({
+    dataType() {
+        return "bytea";
+    },
+    toDriver(val: Buffer) {
+        return val;
+    },
+    fromDriver(val: unknown) {
+        if (Buffer.isBuffer(val)) {
+            return val;
+        }
+        return Buffer.from(val as Uint8Array);
+    },
+});
 
 // ─── Schema ─────────────────────────────────────────────────────
 export const documentsSchema = pgSchema("documents_schema");

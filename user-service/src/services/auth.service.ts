@@ -59,7 +59,7 @@ export async function loginUser(email: string, password: string) {
     };
 
     const token = jwt.sign(payload, config.jwtSecret, {
-        expiresIn: config.jwtExpiry,
+        expiresIn: config.jwtExpiry as any,
     });
 
     authLogger.info({ userId: user.id }, "User logged in");

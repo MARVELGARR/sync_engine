@@ -50,7 +50,7 @@ async function consumeStream(): Promise<void> {
             // XREADGROUP: read new messages for this consumer.
             // ">" means only deliver messages that have never been delivered to this consumer.
             // BLOCK waits for new messages if none are available.
-            const results = await redis.xreadgroup(
+            const results = (await redis.xreadgroup(
                 "GROUP",
                 config.consumerGroup,
                 config.consumerName,
@@ -61,7 +61,7 @@ async function consumeStream(): Promise<void> {
                 "STREAMS",
                 config.streamName,
                 ">"
-            );
+            )) as any;
 
             if (!results || results.length === 0) {
                 // No messages — the BLOCK timed out. Loop again.
