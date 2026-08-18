@@ -40,7 +40,7 @@ export async function writeSnapshot(
         // Insert the new snapshot
         await tx.insert(documentSnapshots).values({
             documentId,
-            snapshotData: snapshotData as unknown as Uint8Array,
+            snapshotData: Buffer.isBuffer(snapshotData) ? snapshotData : Buffer.from(snapshotData),
             snapshotVersion: nextVersion,
         });
 
@@ -63,7 +63,7 @@ export async function writeDeltaAudit(
 
     const rows: DeltaInsert[] = entries.map((e) => ({
         documentId: e.documentId,
-        deltaData: e.deltaData as unknown as Uint8Array,
+        deltaData: Buffer.isBuffer(e.deltaData) ? e.deltaData : Buffer.from(e.deltaData),
         userId: e.userId,
     }));
 
