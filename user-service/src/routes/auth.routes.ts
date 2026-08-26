@@ -11,5 +11,6 @@ router.post("/login", authRateLimiter, authCtrl.login);
 
 // Protected routes
 router.get("/me", authMiddleware, authCtrl.me);
+router.post("/refresh", authMiddleware, authCtrl.refresh);
 
 export default router;

@@ -1,3 +1,7 @@
+
+
+
+
 import pino from "pino";
 import { config } from "../config/env.js";
 
@@ -8,6 +12,7 @@ export const logger = pino({
             ? { target: "pino-pretty", options: { colorize: true } }
             : undefined,
 });
+export const dbLogger = logger.child({ service: "database" });
 
 export const authLogger = logger.child({ service: "auth" });
 export const userLogger = logger.child({ service: "user" });

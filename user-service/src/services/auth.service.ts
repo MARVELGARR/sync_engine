@@ -83,6 +83,40 @@ export function verifyToken(token: string): JWTPayload {
     }
 }
 
+// ─── Refresh Token ──────────────────────────────────────────────
+export async function refreshToken(currentToken: string) {
+    // Verify the current token is still valid
+    const payload = verifyToken(currentToken);
+
+    // Confirm the user still exists (may have been deleted since token was issued)
+    const user = await queries.findUserById(payload.sub);
+    if (!user) {
+        throw new AppError("User no longer exists", 401);
+    }
+
+    // Issue a fresh JWT
+    const newPayload: Omit<JWTPayload, "iat" | "exp"> = {
+        sub: user.id,
+        email: user.email,
+        displayName: user.displayName,
+    };
+
+    const token = jwt.sign(newPayload, config.jwtSecret, {
+        expiresIn: config.jwtExpiry as any,
+    });
+
+    authLogger.info({ userId: user.id }, "Token refreshed");
+
+    return {
+        token,
+        user: {
+            id: user.id,
+            email: user.email,
+            displayName: user.displayName,
+        },
+    };
+}
+
 // ─── Get User Profile ───────────────────────────────────────────
 export async function getUserProfile(userId: string) {
     const user = await queries.findUserById(userId);

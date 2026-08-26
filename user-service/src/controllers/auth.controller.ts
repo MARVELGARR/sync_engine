@@ -49,3 +49,19 @@ export async function me(
         next(err);
     }
 }
+
+// ─── POST /api/auth/refresh ─────────────────────────────────────
+export async function refresh(
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> {
+    try {
+        const authHeader = req.headers.authorization;
+        const currentToken = authHeader!.slice(7); // "Bearer " prefix already verified by authMiddleware
+        const result = await authService.refreshToken(currentToken);
+        res.status(200).json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+}
