@@ -1,8 +1,22 @@
 {
-    "extends": "../tsconfig.base.json",
+    // NOTE: intentionally self-contained (no `extends: ../tsconfig.base.json`)
+    // so `docker build` with context ./persist-worker works.
+    // Mirrors ../tsconfig.base.json.
     "compilerOptions": {
+        "target": "ES2022",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "strict": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "skipLibCheck": true,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
         "outDir": "./dist",
-        "rootDir": "./src"
+        "rootDir": "./src",
+        "resolveJsonModule": true,
+        "isolatedModules": true
     },
     "include": [
         "src/**/*"

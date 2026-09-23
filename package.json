@@ -14,9 +14,9 @@
         "dev:sync": "npm run dev --workspace=sync-service",
         "dev:persist": "npm run dev --workspace=persist-worker",
         "build:all": "npm run build --workspaces",
-        "docker:up": "docker-compose up --build -d",
-        "docker:down": "docker-compose down",
-        "docker:logs": "docker-compose logs -f",
+        "docker:up": "docker compose up --build -d",
+        "docker:down": "docker compose down",
+        "docker:logs": "docker compose logs -f",
         "test:auth": "npx tsx tests/integration/auth-flow.test.ts",
         "test:sync": "npx tsx tests/integration/sync-flow.test.ts",
         "test:all": "npm run test:auth && npm run test:sync"
