@@ -203,3 +203,27 @@ services:
         condition: service_healthy
     networks:
       - sync-network
+
+  # ─────────────────────────────────────────────────────────────
+  # 8. Frontend — Next.js standalone
+  # ─────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    networks:
+      - sync-network
+    healthcheck:
+      # NOTE: use 127.0.0.1, not localhost — Alpine resolves localhost to ::1
+      # (IPv6) but the Next.js standalone server binds IPv4 only.
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
