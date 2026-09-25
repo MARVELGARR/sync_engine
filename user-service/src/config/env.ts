@@ -19,8 +19,10 @@ export const config = {
     // Ephemeral guest sessions live 7 days, then require conversion.
     guestExpiry: process.env.GUEST_EXPIRY || "7d",
     // Comma-separated list of allowed browser origins (CORS).
-    // Defaults to permissive in dev; lock down in production.
-    corsOrigins: (process.env.CORS_ORIGINS || "http://localhost:3000,http://localhost")
+    // "http://localhost" covers the gateway on :80 (same-origin prod).
+    // "http://localhost:3000" covers direct Next.js dev / debug access.
+    // Lock down in production via CORS_ORIGINS env (or "*" for open dev).
+    corsOrigins: (process.env.CORS_ORIGINS || "http://localhost,http://localhost:3000")
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),

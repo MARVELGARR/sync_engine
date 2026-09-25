@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useQueryStates } from "nuqs";
+import { documentsSearchParams } from "./searchParams";
 import { toast } from "sonner";
 import { ClaimAccountDialog } from "@/components/claim-account-dialog";
 import { Sparkles } from "lucide-react";
@@ -32,14 +34,27 @@ type Filter = "all" | "owned" | "shared";
 type Sort = "updated" | "created" | "title";
 
 export default function DocumentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <DocumentsView />
+    </Suspense>
+  );
+}
+
+function DocumentsView() {
   const user = useAuthStore((s) => s.user);
   const { data, isLoading, isError, error, refetch } = useDocuments();
   const createDoc = useCreateDocument();
   const deleteDoc = useDeleteDocument();
 
-  const [filter, setFilter] = useState<Filter>("all");
-  const [sort, setSort] = useState<Sort>("updated");
-  const [query, setQuery] = useState("");
+  // URL-owned workspace state (nuqs): shareable, survives refresh, drives
+  // back/forward. Local useState is only for ephemeral dialogs below.
+  const [{ q: query, filter, sort }, setParams] = useQueryStates(documentsSearchParams, {
+    history: "push",
+  });
+  const setQuery = (v: string) => void setParams({ q: v === "" ? null : v });
+  const setFilter = (v: Filter) => void setParams({ filter: v === "all" ? null : v });
+  const setSort = (v: Sort) => void setParams({ sort: v === "updated" ? null : v });
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);

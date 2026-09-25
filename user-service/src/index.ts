@@ -24,9 +24,15 @@ app.use(
         origin: (origin, cb) => {
             // Same-origin / server-to-server calls have no Origin header.
             if (!origin) return cb(null, true);
+            if (config.corsOrigins.includes("*")) return cb(null, true);
             if (config.corsOrigins.includes(origin)) return cb(null, true);
             cb(new Error("CORS: origin not allowed"));
         },
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Authorization", "Content-Type"],
+        exposedHeaders: ["Content-Length"],
+        maxAge: 86400,
+        optionsSuccessStatus: 204,
     })
 );
 // Cap JSON bodies — auth payloads are tiny; rejects oversized junk early.

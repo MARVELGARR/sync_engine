@@ -4,6 +4,7 @@ import "./globals.css";
 import { QueryProvider } from "@/lib/query-provider";
 import { AuthBootstrap } from "@/components/auth-bootstrap";
 import { Toaster } from "@/components/ui/toaster";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,11 +28,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-white text-slate-900">
-        <QueryProvider>
-          <AuthBootstrap />
-          {children}
-          <Toaster />
-        </QueryProvider>
+        <NuqsAdapter>
+          <QueryProvider>
+            <AuthBootstrap />
+            {children}
+            <Toaster />
+          </QueryProvider>
+        </NuqsAdapter>
       </body>
     </html>
   );

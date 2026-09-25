@@ -1,3 +1,8 @@
+# ─── Sync Engine Frontend — Next.js standalone ─────────────────
+# NEXT_PUBLIC_* values are baked at build time by Next.js.
+# Pass them as build args (see docker-compose.yml `frontend.build.args`).
+# Runtime needs nothing secret: the browser calls the gateway origin.
+
 # 1. Base Image
 FROM node:20-alpine AS base
 
@@ -22,6 +27,12 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Build-time public config (baked into the client bundle).
+ARG NEXT_PUBLIC_API_URL=http://localhost/api
+ARG NEXT_PUBLIC_WS_URL=ws://localhost/ws
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 
 # Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -57,10 +68,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-EXPOSE 300
+EXPOSE 3000
 
-ENV PORT=3003
+ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=10 \
+  CMD wget -qO- http://127.0.0.1:3000/ || exit 1
 
 # Run the standalone Node server
 CMD ["node", "server.js"]
