@@ -55,6 +55,7 @@ export class SyncProvider {
   private retries = 0;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private everConnected = false;
 
   constructor(doc: Y.Doc, opts: ProviderOptions) {
     this.doc = doc;
@@ -76,6 +77,22 @@ export class SyncProvider {
     this.openSocket();
   }
 
+  /**
+   * Re-run the Yjs sync handshake against the server to pull any state
+   * this client is missing (e.g. snapshots flushed to the DB after we
+   * connected, or a room that was empty when we joined). Safe to call any
+   * time the socket is open — sync messages are idempotent merges.
+   * Returns false when there is no open connection to sync over.
+   */
+  requestSync(): boolean {
+    if (this.ws?.readyState !== WebSocket.OPEN) return false;
+    const enc = encoding.createEncoder();
+    encoding.writeVarUint(enc, MESSAGE_SYNC);
+    syncProtocol.writeSyncStep1(enc, this.doc);
+    this.ws.send(encoding.toUint8Array(enc));
+    return true;
+  }
+
   private openSocket() {
     if (this.closed) return;
     this.setStatus(this.retries === 0 ? "connecting" : "reconnecting");
@@ -92,6 +109,7 @@ export class SyncProvider {
 
     ws.onopen = () => {
       this.retries = 0;
+      this.everConnected = true;
       this.setStatus("connected");
       // Initiate Yjs handshake
       const enc = encoding.createEncoder();
@@ -247,8 +265,16 @@ export class SyncProvider {
     this.closed = true;
     this.stopPing();
     if (this.saveTimer) clearTimeout(this.saveTimer);
-    // Flush final state to IndexedDB
-    void idb.saveYState(this.opts.docId, Y.encodeStateAsUpdate(this.doc));
+    // Flush final state to IndexedDB — but never poison the cache with an
+    // empty doc when we never synced (e.g. joinee opened an empty room,
+    // then left). Next open re-syncs from the server instead of restoring
+    // our empty snapshot.
+    const ytext = this.doc.getText("content");
+    if (this.everConnected || ytext.length > 0) {
+      void idb.saveYState(this.opts.docId, Y.encodeStateAsUpdate(this.doc));
+    } else {
+      void idb.clearYState(this.opts.docId);
+    }
     try {
       awarenessProtocol.removeAwarenessStates(this.awareness, [this.doc.clientID], "local");
     } catch {

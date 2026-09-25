@@ -95,14 +95,37 @@ export class DocumentRoom {
     }
 
     /**
+     * Re-load the latest snapshot from DB and CRDT-merge it into the live room.
+     * Safe to call any time: Yjs updates are commutative, so this only fills
+     * in history the room is missing — it never overwrites live edits.
+     *
+     * Why this exists: rooms are in-memory per sync node and the gateway
+     * round-robins /ws across nodes. A room created on node B after the
+     * owner edited on node A starts empty (snapshots flush async, ~5s),
+     * and cross-node Redis Pub/Sub only forwards *live* updates — late
+     * joiners miss history. Re-merging on every join closes that gap as
+     * soon as the persist-worker has flushed at least once.
+     */
+    async refreshFromSnapshot(): Promise<void> {
+        const snapshot = await loadLatestSnapshot(this.docId);
+        if (snapshot) {
+            Y.applyUpdate(this.yDoc, new Uint8Array(snapshot));
+            roomLogger.info({ docId: this.docId }, "Merged latest snapshot into live room");
+        }
+    }
+
+    /**
      * Add a client WebSocket to this room and sync them.
      */
-    addClient(client: ClientInfo): void {
+    async addClient(client: ClientInfo): Promise<void> {
         // Cancel any pending cleanup
         if (this.cleanupTimer) {
             clearTimeout(this.cleanupTimer);
             this.cleanupTimer = null;
         }
+
+        // Pull any snapshot flushed since this room was created (see above).
+        await this.refreshFromSnapshot();
 
         this.clients.set(client.ws, client);
 

@@ -29,6 +29,7 @@ import {
   Clock,
   CloudOff,
   Lock,
+  RefreshCw,
 } from "lucide-react";
 
 export default function EditorPage() {
@@ -47,6 +48,7 @@ export default function EditorPage() {
   const [text, setText] = useState("");
   const [lastActivity, setLastActivity] = useState<Date | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const ydocRef = useRef<Y.Doc | null>(null);
   const ytextRef = useRef<Y.Text | null>(null);
@@ -177,6 +179,27 @@ export default function EditorPage() {
     (authQuery.data && !authQuery.data.authorized) ||
     (loadError instanceof ApiError && (loadError.status === 403 || loadError.status === 404));
 
+  // Pull latest server state on demand: refetch metadata/permission, then
+  // re-run the Yjs handshake so snapshots flushed to the DB after we
+  // connected are merged in. This is the recovery path when a joinee
+  // opened the doc before the owner's edits were persisted.
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([docQuery.refetch(), authQuery.refetch()]);
+      const synced = providerRef.current?.requestSync() ?? false;
+      if (!synced) {
+        toast.message("Reconnecting… sync will resume when connected.");
+      } else {
+        toast.success("Refreshed — pulling latest content.");
+      }
+    } catch {
+      toast.error("Could not refresh. Try again.");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [docQuery, authQuery]);
+
   return (
     <Protected>
       <div className="workspace-bg flex min-h-screen flex-col">
@@ -204,6 +227,16 @@ export default function EditorPage() {
                 </Badge>
               )}
               <ConnBadge status={status} />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onRefresh}
+                disabled={refreshing || loading}
+                title="Pull the latest content from the server"
+              >
+                <RefreshCw className={refreshing ? "animate-spin" : undefined} />
+                Refresh
+              </Button>
               <div className="flex -space-x-2">
                 {presence.slice(0, 5).map((p) => (
                   <Avatar key={p.clientId} name={p.name ?? "?"} className="size-7 text-[10px]" />
@@ -318,6 +351,7 @@ export default function EditorPage() {
                   <li>Edits broadcast instantly to every connected tab.</li>
                   <li>Snapshots are written async (≤ 5s) — “Connected” means live, not yet persisted.</li>
                   <li>Offline edits are kept in IndexedDB and sync on reconnect.</li>
+                  <li>Opened a shared doc and it looks empty? Hit Refresh to pull the latest saved content.</li>
                 </ul>
               </CardContent>
             </Card>

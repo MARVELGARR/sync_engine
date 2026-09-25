@@ -89,7 +89,7 @@ wss.on("connection", async (ws: WebSocket, req: http.IncomingMessage) => {
         permission: authResult.permission,
     };
 
-    room.addClient(clientInfo);
+    await room.addClient(clientInfo);
 
     // ── Handle incoming messages ──────────────────────────────
     ws.on("message", (data: Buffer) => {
