@@ -57,9 +57,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-EXPOSE 3000
+EXPOSE 300
 
-ENV PORT=3000
+ENV PORT=3003
 ENV HOSTNAME="0.0.0.0"
 
 # Run the standalone Node server

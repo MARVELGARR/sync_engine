@@ -12,10 +12,16 @@ interface AuthState {
   hydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
+  /** Mint an ephemeral guest session — no credentials needed. */
+  loginAsGuest: (displayName?: string) => Promise<void>;
+  /** Convert the current guest session into a full account. */
+  claimGuest: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => Promise<void>;
   bootstrap: () => Promise<void>;
   setSession: (token: string, user: SessionUser) => Promise<void>;
 }
+
+export const isGuestUser = (u: SessionUser | null): boolean => !!u?.isGuest;
 
 function persistToken(token: string | null) {
   try {
@@ -47,6 +53,23 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     await api.post("/auth/register", { email, password, displayName });
     // Backend register does not return a token -> log in immediately.
     await get().login(email, password);
+  },
+
+  loginAsGuest: async (displayName) => {
+    const data = await api.post<AuthResponse>(
+      "/auth/guest",
+      displayName?.trim() ? { displayName: displayName.trim() } : {}
+    );
+    await get().setSession(data.token, data.user);
+  },
+
+  claimGuest: async (email, password, displayName) => {
+    const data = await api.post<AuthResponse>("/auth/claim", {
+      email,
+      password,
+      ...(displayName?.trim() ? { displayName: displayName.trim() } : {}),
+    });
+    await get().setSession(data.token, data.user);
   },
 
   logout: async () => {

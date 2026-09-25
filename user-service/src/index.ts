@@ -19,8 +19,18 @@ app.set("trust proxy", 1);
 
 // ─── Global Middleware ──────────────────────────────────────────
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+app.use(
+    cors({
+        origin: (origin, cb) => {
+            // Same-origin / server-to-server calls have no Origin header.
+            if (!origin) return cb(null, true);
+            if (config.corsOrigins.includes(origin)) return cb(null, true);
+            cb(new Error("CORS: origin not allowed"));
+        },
+    })
+);
+// Cap JSON bodies — auth payloads are tiny; rejects oversized junk early.
+app.use(express.json({ limit: "10kb" }));
 app.use(cookieParser());
 
 // ─── Global API Rate Limiter ────────────────────────────────────

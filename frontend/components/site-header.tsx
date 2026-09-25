@@ -2,16 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useAuthStore } from "@/lib/auth-store";
 import { Button } from "./ui/button";
 import { Avatar } from "./ui/avatar";
-import { Zap, LogOut, FileText, User as UserIcon } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { ClaimAccountDialog } from "./claim-account-dialog";
+import { Zap, LogOut, FileText, User as UserIcon, Sparkles } from "lucide-react";
 
 export function SiteHeader() {
   const user = useAuthStore((s) => s.user);
   const ready = useAuthStore((s) => s.ready);
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
+  const [claimOpen, setClaimOpen] = useState(false);
+
+  const isGuest = !!user?.isGuest;
 
   const onLogout = async () => {
     await logout();
@@ -38,15 +44,27 @@ export function SiteHeader() {
                   <FileText /> Documents
                 </Button>
               </Link>
-              <Link href="/settings/profile">
-                <Button variant="ghost" size="sm">
-                  <Avatar name={user.displayName} className="size-6 text-[10px]" />
-                  <span className="max-w-28 truncate">{user.displayName}</span>
-                </Button>
-              </Link>
+              {isGuest ? (
+                <>
+                  <Badge variant="warning">
+                    Guest
+                  </Badge>
+                  <Button size="sm" onClick={() => setClaimOpen(true)}>
+                    <Sparkles /> Create account
+                  </Button>
+                </>
+              ) : (
+                <Link href="/settings/profile">
+                  <Button variant="ghost" size="sm">
+                    <Avatar name={user.displayName} className="size-6 text-[10px]" />
+                    <span className="max-w-28 truncate">{user.displayName}</span>
+                  </Button>
+                </Link>
+              )}
               <Button variant="outline" size="sm" onClick={onLogout}>
                 <LogOut /> Logout
               </Button>
+              <ClaimAccountDialog open={claimOpen} onOpenChange={setClaimOpen} />
             </>
           ) : (
             <>

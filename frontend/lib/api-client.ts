@@ -55,8 +55,6 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   if (res.status === 401 && tokenGetter()) {
     // Try a single token refresh before giving up.
     try {
-      const refreshRes = await doFetch(tokenGetter());
-      // Use dedicated refresh call with current token
       const r = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
         headers: {
@@ -71,8 +69,6 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
           tokenSetter(next);
           res = await doFetch(next);
         }
-      } else {
-        void refreshRes;
       }
     } catch {
       /* fall through to error handling */

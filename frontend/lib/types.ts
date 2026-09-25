@@ -4,6 +4,8 @@ export interface SessionUser {
   id: string;
   email: string;
   displayName: string;
+  /** True for ephemeral guest sessions (upgrade via claim). */
+  isGuest?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

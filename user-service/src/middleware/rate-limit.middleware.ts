@@ -27,6 +27,32 @@ export const authRateLimiter = rateLimit({
     },
 });
 
+// ─── Guest Rate Limiter ──────────────────────────────────────────
+// Creating guest accounts is cheap and anonymous — cap it harder than
+// login so one IP can't flood the users table (20/hour).
+export const guestRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    limit: 20,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: {
+        success: false,
+        error: "Too many guest sessions from this IP, please try again later.",
+    },
+    handler(req, res, _next, options) {
+        logger.warn(
+            {
+                ip: req.ip,
+                path: req.path,
+                limit: options.limit,
+                windowMs: options.windowMs,
+            },
+            "Guest rate limit exceeded"
+        );
+        res.status(options.statusCode).json(options.message);
+    },
+});
+
 // ─── API Rate Limiter ────────────────────────────────────────────
 // General limit for all other API endpoints.
 // 120 requests per minute per IP.

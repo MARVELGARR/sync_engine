@@ -3,6 +3,8 @@ import * as authService from "../services/auth.service.js";
 import {
     registerSchema,
     loginSchema,
+    guestSchema,
+    claimGuestSchema,
 } from "../schemas/validation.js";
 
 // ─── POST /api/auth/register ────────────────────────────────────
@@ -29,6 +31,43 @@ export async function login(
     try {
         const { email, password } = loginSchema.parse(req.body);
         const result = await authService.loginUser(email, password);
+        res.status(200).json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+}
+
+// ─── POST /api/auth/guest ───────────────────────────────────────
+// Public: mints an ephemeral guest session (no credentials needed).
+export async function guest(
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> {
+    try {
+        const { displayName } = guestSchema.parse(req.body ?? {});
+        const result = await authService.createGuestUser(displayName);
+        res.status(201).json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+}
+
+// ─── POST /api/auth/claim ───────────────────────────────────────
+// Protected (guest JWT): converts the caller's guest account into a full account.
+export async function claim(
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> {
+    try {
+        const { email, password, displayName } = claimGuestSchema.parse(req.body);
+        const result = await authService.claimGuestAccount(
+            req.user!.sub,
+            email,
+            password,
+            displayName
+        );
         res.status(200).json({ success: true, data: result });
     } catch (err) {
         next(err);

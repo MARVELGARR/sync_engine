@@ -69,6 +69,12 @@ export async function shareDocument(
         throw new AppError("Cannot share a document with yourself", 400);
     }
 
+    // Guest accounts are ephemeral — sharing requires a full account.
+    const owner = await queries.findUserById(ownerId);
+    if ((owner as any)?.isGuest) {
+        throw new AppError("Create an account to share documents", 403);
+    }
+
     const perm = await queries.grantPermission({
         documentId: docId,
         userId: targetUser.id,

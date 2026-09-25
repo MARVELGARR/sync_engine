@@ -5,6 +5,8 @@ import {
     timestamp,
     pgEnum,
     uniqueIndex,
+    boolean,
+    integer,
 } from "drizzle-orm/pg-core";
 
 // ─── Schema ─────────────────────────────────────────────────────
@@ -22,6 +24,14 @@ export const users = usersSchema.table("users", {
     email: varchar("email", { length: 255 }).unique().notNull(),
     passwordHash: varchar("password_hash", { length: 255 }).notNull(),
     displayName: varchar("display_name", { length: 100 }).notNull(),
+    // ── Hardened auth + guest mode ──
+    // isGuest marks ephemeral guest accounts (auto-expiring, convertible).
+    isGuest: boolean("is_guest").notNull().default(false),
+    // Null for full accounts; expiry timestamp for guests.
+    guestExpiresAt: timestamp("guest_expires_at", { withTimezone: true }),
+    // Bumped whenever credentials change (password set, guest claimed)
+    // so previously issued JWTs can be rejected via the `tv` claim.
+    tokenVersion: integer("token_version").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });

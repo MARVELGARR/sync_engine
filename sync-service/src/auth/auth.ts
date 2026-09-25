@@ -6,6 +6,12 @@ export interface JWTPayload {
     sub: string;
     email: string;
     displayName: string;
+    type?: "access" | "guest";
+    isGuest?: boolean;
+    tv?: number;
+    iss?: string;
+    aud?: string;
+    jti?: string;
     iat: number;
     exp: number;
 }
@@ -19,9 +25,21 @@ export interface AuthorizeResult {
 
 /**
  * Verify a JWT token locally using the shared secret.
+ * Enforces issuer/audience on new tokens; legacy tokens minted before
+ * iss/aud was added verify by signature only (replaced on next login).
  */
 export function verifyToken(token: string): JWTPayload {
-    return jwt.verify(token, config.jwtSecret) as JWTPayload;
+    try {
+        return jwt.verify(token, config.jwtSecret, {
+            issuer: config.jwtIssuer,
+            audience: config.jwtAudience,
+        }) as JWTPayload;
+    } catch (err: any) {
+        if (err?.name === "JsonWebTokenError" && /jwt (issuer|audience)/.test(err.message)) {
+            return jwt.verify(token, config.jwtSecret) as JWTPayload;
+        }
+        throw err;
+    }
 }
 
 /**

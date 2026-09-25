@@ -6,6 +6,8 @@ export const config = {
     nodeId: process.env.NODE_ID || "sync-1",
     redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
     jwtSecret: process.env.JWT_SECRET || "dev-secret-change-me",
+    jwtIssuer: process.env.JWT_ISSUER || "sync-engine",
+    jwtAudience: process.env.JWT_AUDIENCE || "sync-engine-app",
     userServiceUrl: process.env.USER_SERVICE_URL || "http://localhost:3000",
     databaseUrl: process.env.DATABASE_URL || "postgresql://sync_admin:changeme@localhost:5432/sync_engine",
 

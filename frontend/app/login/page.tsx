@@ -26,8 +26,10 @@ type FormValues = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const login = useAuthStore((s) => s.login);
+  const loginAsGuest = useAuthStore((s) => s.loginAsGuest);
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [guestLoading, setGuestLoading] = useState(false);
   const { register, handleSubmit, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
@@ -43,6 +45,20 @@ export default function LoginPage() {
       setServerError(msg);
     }
   });
+
+  const onGuest = async () => {
+    setServerError(null);
+    setGuestLoading(true);
+    try {
+      await loginAsGuest();
+      toast.success("Continuing as guest — create an account to keep your work.");
+      router.push("/documents");
+    } catch (e) {
+      setServerError(e instanceof ApiError ? e.message : "Could not start guest session.");
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   return (
     <div className="workspace-bg min-h-screen">
@@ -73,11 +89,23 @@ export default function LoginPage() {
                 {formState.isSubmitting && <Loader2 className="animate-spin" />}
                 Log in
               </Button>
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                <span className="h-px flex-1 bg-slate-200" />
+                or
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+              <Button type="button" variant="outline" className="w-full" onClick={onGuest} disabled={guestLoading || formState.isSubmitting}>
+                {guestLoading && <Loader2 className="animate-spin" />}
+                Continue as guest
+              </Button>
               <p className="text-center text-sm text-slate-500">
                 No account?{" "}
                 <Link href="/register" className="font-semibold text-brand-700 hover:underline">
                   Create one
                 </Link>
+              </p>
+              <p className="text-center text-xs text-slate-400">
+                Guests can create and edit documents. Sharing needs a free account.
               </p>
             </form>
           </CardContent>

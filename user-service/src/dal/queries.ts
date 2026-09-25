@@ -1,4 +1,4 @@
-import { eq, and, or } from "drizzle-orm";
+import { eq, and, or, lt } from "drizzle-orm";
 import { db } from "../config/db.js";
 import {
     users,
@@ -33,6 +33,9 @@ export async function findUserById(id: string) {
             id: users.id,
             email: users.email,
             displayName: users.displayName,
+            isGuest: users.isGuest,
+            guestExpiresAt: users.guestExpiresAt,
+            tokenVersion: users.tokenVersion,
             createdAt: users.createdAt,
             updatedAt: users.updatedAt,
         })
@@ -40,6 +43,43 @@ export async function findUserById(id: string) {
         .where(eq(users.id, id))
         .limit(1);
     return user ?? null;
+}
+
+// Promote a guest row to a full account and revoke old guest tokens.
+export async function claimGuestUser(
+    id: string,
+    data: { email: string; passwordHash: string; displayName: string }
+) {
+    const [updated] = await db
+        .update(users)
+        .set({
+            email: data.email,
+            passwordHash: data.passwordHash,
+            displayName: data.displayName,
+            isGuest: false,
+            guestExpiresAt: null,
+            tokenVersion: 1,
+            updatedAt: new Date(),
+        })
+        .where(and(eq(users.id, id), eq(users.isGuest, true)))
+        .returning({
+            id: users.id,
+            email: users.email,
+            displayName: users.displayName,
+            isGuest: users.isGuest,
+            tokenVersion: users.tokenVersion,
+            createdAt: users.createdAt,
+        });
+    return updated ?? null;
+}
+
+// Housekeeping: remove expired guest accounts (documents cascade-delete).
+export async function deleteExpiredGuests() {
+    const expired = await db
+        .delete(users)
+        .where(and(eq(users.isGuest, true), lt(users.guestExpiresAt, new Date())))
+        .returning({ id: users.id });
+    return expired.length;
 }
 
 // ═══════════════════════════════════════════════════════════════

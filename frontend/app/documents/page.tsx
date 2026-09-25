@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ClaimAccountDialog } from "@/components/claim-account-dialog";
+import { Sparkles } from "lucide-react";
 import { Protected } from "@/components/protected";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,8 @@ export default function DocumentsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [claimOpen, setClaimOpen] = useState(false);
+  const isGuest = !!user?.isGuest;
 
   const docs = useMemo(() => {
     const list = data ?? [];
@@ -93,6 +97,17 @@ export default function DocumentsPage() {
       <div className="workspace-bg min-h-screen">
         <SiteHeader />
         <main className="mx-auto max-w-6xl px-4 py-8">
+          {isGuest && (
+            <Alert className="mb-4 flex flex-wrap items-center justify-between gap-3 border-amber-200 bg-amber-50">
+              <span className="flex items-center gap-2 text-sm text-amber-900">
+                <Sparkles className="size-4" />
+                You&apos;re browsing as a guest — sessions expire after 7 days and sharing is disabled.
+              </span>
+              <Button size="sm" onClick={() => setClaimOpen(true)}>
+                Create free account
+              </Button>
+            </Alert>
+          )}
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-brand-950">Documents</h1>
@@ -209,6 +224,8 @@ export default function DocumentsPage() {
             ))}
           </div>
         </main>
+
+        <ClaimAccountDialog open={claimOpen} onOpenChange={setClaimOpen} />
 
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogHeader>
