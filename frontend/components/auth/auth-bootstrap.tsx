@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useAuthStore } from "@/lib/auth-store";
+import { useAuthStore } from "@/stores/use-auth-store";
 
 export function AuthBootstrap() {
   const bootstrap = useAuthStore((s) => s.bootstrap);

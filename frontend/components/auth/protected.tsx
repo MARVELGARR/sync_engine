@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/lib/auth-store";
-import { SiteHeader } from "./site-header";
-import { Skeleton } from "./ui/avatar";
+import { useAuthStore } from "@/stores/use-auth-store";
+import { SiteHeader } from "@/components/layout/site-header";
+import { Skeleton } from "@/components/ui/avatar";
 
 export function Protected({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);

@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAuthStore } from "@/lib/auth-store";
-import { Button } from "./ui/button";
-import { Avatar } from "./ui/avatar";
-import { Badge } from "./ui/badge";
-import { ClaimAccountDialog } from "./claim-account-dialog";
+import { useAuthStore } from "@/stores/use-auth-store";
+import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { ClaimAccountDialog } from "@/components/auth/claim-account-dialog";
 import { Zap, LogOut, FileText, User as UserIcon, Sparkles } from "lucide-react";
 
 export function SiteHeader() {

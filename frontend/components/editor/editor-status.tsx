@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge } from "./ui/badge";
+import { Badge } from "@/components/ui/badge";
 import type { ConnStatus } from "@/lib/yjs-provider";
 import { Wifi, WifiOff, Loader2, ShieldAlert, Ban, Users } from "lucide-react";
 

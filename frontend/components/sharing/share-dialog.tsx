@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Badge } from "./ui/badge";
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { ApiError } from "@/lib/api-client";
-import { useRevokeShare, useShareDocument } from "@/lib/documents";
+import { useRevokeShare, useShareDocument } from "@/hooks/queries/use-documents";
 import { Loader2, Share2, Trash2 } from "lucide-react";
 
 interface GrantedEntry {
