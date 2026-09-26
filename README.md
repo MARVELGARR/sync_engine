@@ -13,6 +13,9 @@ Sync Engine lets users create documents, edit them concurrently, share them with
 - JWT authentication with token refresh and revocation via token versions.
 - Guest sessions that can create and edit documents before being converted into full accounts.
 - Document sharing with `read` and `read-write` permissions.
+- URL-driven document search, filtering, and sorting that survives refresh and can be shared as a link.
+- Offline document/session caching in IndexedDB with automatic synchronization after reconnect.
+- Visible collaborator presence, connection status, and a manual refresh/re-sync recovery path.
 - Next.js frontend served behind the same Nginx gateway as the REST and WebSocket APIs.
 - PostgreSQL storage for users, document metadata, permissions, snapshots, and an update audit trail.
 - Rate limiting, WebSocket heartbeats, connection limits, and structured Pino logging.
@@ -143,6 +146,26 @@ docker compose down -v
 
 Guest sessions expire after seven days by default. Guests can create and edit documents, but they cannot share documents until the session is claimed as a full account.
 
+### Workspace features
+
+The documents workspace provides:
+
+- Search by document title.
+- `All`, `Owned`, and `Shared` filters.
+- Sorting by last updated, title, or creation date.
+- URL-owned workspace state, so search/filter/sort choices survive refresh, browser back/forward, and shared links.
+- Create and delete dialogs with retry states for document loading failures.
+- A guest banner with an in-context account-claim flow.
+
+The editor provides:
+
+- Live document content over the Yjs WebSocket provider.
+- Collaborator presence and connection status.
+- Read-only behavior for users with `read` permission.
+- Offline restoration from IndexedDB and local persistence while disconnected.
+- A **Refresh** action that re-fetches document metadata and re-runs the Yjs handshake to merge the latest persisted snapshot.
+- Profile settings with session details, logout, and a **Clear local cache** action for IndexedDB data.
+
 ## API reference
 
 The gateway exposes the REST API under `/api`. Protected endpoints expect:
@@ -270,9 +293,16 @@ Copy `.env.example` to `.env` and adjust values for the environment. The most im
 
 ## Development commands
 
-Install dependencies from the repository root:
+Install the backend workspace dependencies from the repository root:
 
 ```bash
+npm install
+```
+
+The frontend is maintained as a separate Next.js package and is not included in the root npm workspace list. Install its dependencies separately when running it outside Docker:
+
+```bash
+cd frontend
 npm install
 ```
 
@@ -290,7 +320,13 @@ These commands expect PostgreSQL and Redis to be available and the relevant envi
 npm run dev:user
 npm run dev:sync
 npm run dev:persist
-npm run --workspace=frontend dev
+```
+
+Run the frontend from its own directory:
+
+```bash
+cd frontend
+npm run dev
 ```
 
 ### Run infrastructure only
@@ -316,8 +352,9 @@ npm run --workspace=persist-worker db:studio
 ### Frontend checks
 
 ```bash
-npm run --workspace=frontend lint
-npm run --workspace=frontend build
+cd frontend
+npm run lint
+npm run build
 ```
 
 ## Testing
@@ -361,6 +398,18 @@ For production, use managed PostgreSQL and Redis where appropriate, rotate all s
 sync_engine/
 ├── gateway/                 # Nginx reverse-proxy configuration
 ├── frontend/                # Next.js web application
+│   ├── app/                  # Route shells for auth, documents, editor, and profile pages
+│   ├── components/
+│   │   ├── auth/             # Login, registration, protection, guest claiming
+│   │   ├── documents/        # Workspace view, toolbar, cards, and CRUD dialogs
+│   │   ├── editor/           # Editor orchestration, canvas, top bar, presence, sync hook
+│   │   ├── layout/           # Shared site header
+│   │   ├── settings/         # Profile and local-cache controls
+│   │   ├── sharing/          # Document-sharing dialog
+│   │   └── ui/               # Reusable buttons, cards, inputs, badges, and dialogs
+│   ├── hooks/queries/        # React Query document hooks
+│   ├── lib/                  # API client, Yjs provider, IndexedDB, types, query setup
+│   └── stores/               # Zustand auth/session state
 ├── user-service/            # Express REST API, auth, users, documents, permissions
 │   ├── src/
 │   │   ├── config/          # Environment configuration
